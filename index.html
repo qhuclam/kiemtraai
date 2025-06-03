@@ -1,58 +1,87 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <title>AI Fruit Classifier</title>
+  <meta charset="UTF-8">
+  <title>Phân loại quả bằng AI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; }
+    video, canvas, img { max-width: 100%; height: auto; border: 1px solid #ccc; margin-top: 10px; }
+    #result { margin-top: 15px; font-size: 18px; font-weight: bold; }
+    button, input[type=file] { margin: 10px; padding: 10px; font-size: 16px; }
+  </style>
 </head>
 <body>
-  <h2>Chụp ảnh và nhận dự đoán</h2>
-  <video id="video" width="400" height="300" autoplay></video><br>
-  <button onclick="capture()">Chụp & Gửi</button>
-  <canvas id="canvas" width="400" height="300" style="display:none;"></canvas>
-  <div id="result">Kết quả: ...</div>
+
+<h2>Chụp ảnh hoặc chọn ảnh để phân loại quả</h2>
+
+<video id="video" width="300" height="225" autoplay muted playsinline></video><br>
+<button onclick="capture()">📸 Chụp ảnh</button>
+<br>Hoặc<br>
+<input type="file" accept="image/*" onchange="handleFileUpload(this)" />
+
+<canvas id="canvas" width="300" height="225" style="display:none;"></canvas>
+<img id="preview" src="#" style="display:none;" />
+
+<div id="result">Kết quả </div>
 
 <script>
   const video = document.getElementById('video');
   const canvas = document.getElementById('canvas');
+  const preview = document.getElementById('preview');
   const result = document.getElementById('result');
 
-  // Thay YOUR_NGROK_URL bằng URL in ra ở trên (ví dụ https://xxxxx.ngrok.io)
+  // Ngrok backend URL — nhớ sửa thành đúng địa chỉ
   const API_URL = "https://47b4-34-168-113-15.ngrok-free.app/predict";
 
-  // Mở webcam
-  navigator.mediaDevices.getUserMedia({ video: true })
+  // Khởi động webcam (nếu có)
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then(stream => video.srcObject = stream)
-    .catch(err => alert('Không mở được webcam: ' + err));
+    .catch(err => console.log("Không mở được camera:", err));
 
   function capture() {
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob(blob => {
-      result.textContent = "Đang gửi ảnh đến server...";
-      const formData = new FormData();
-      formData.append('image', blob, 'capture.jpg');
-
-      fetch(API_URL, {
-        method: 'POST',
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.label) {
-          result.textContent = `Kết quả: ${data.label} (${data.confidence}%)`;
-          result.style.color = data.label === "Quả tươi" ? 'green' : 'red';
-        } else {
-          result.textContent = "Không nhận được dự đoán";
-          result.style.color = 'black';
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        result.textContent = "Lỗi gửi ảnh đến server";
-      });
+      sendImage(blob);
     }, 'image/jpeg');
   }
+
+  function handleFileUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = "block";
+    sendImage(file);
+  }
+
+  function sendImage(file) {
+    result.textContent = "Đang gửi ảnh...";
+    const formData = new FormData();
+    formData.append('image', file);
+
+    fetch(API_URL, {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.label) {
+        result.textContent = `Kết quả: ${data.label} (${data.confidence}%)`;
+        result.style.color = data.label === "Quả tươi" ? 'green' : 'red';
+      } else {
+        result.textContent = "Không nhận được kết quả.";
+        result.style.color = 'black';
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      result.textContent = "Lỗi khi gửi ảnh đến server.";
+    });
+  }
 </script>
+
 </body>
 </html>
